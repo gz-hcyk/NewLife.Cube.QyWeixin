@@ -18,8 +18,9 @@
     <Copyright>版权所有(C) NewLife 2026</Copyright>
     <Description>企业微信扩展 for NewLife.Cube 魔方：应用消息发送（text/textcard/template_card/update_taskcard）、通讯录同步定时作业、「接收消息」通用回调端点（WXBizMsgCrypt 验签加解密 + IQyWeixinEventHandler 事件分发）。凭据走魔方 OAuth 配置（AppId 写 corp#agent 复合写法）或显式参数，零业务依赖。</Description>
     <PackageTags>NewLife;Cube;魔方;企业微信;WeCom;QyWeixin;TemplateCard;CronJob</PackageTags>
-    <RepositoryUrl>https://github.com/NewLifeX/NewLife.Cube.QyWeixin</RepositoryUrl>
+    <RepositoryUrl>https://github.com/gz-hcyk/NewLife.Cube.QyWeixin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/gz-hcyk/NewLife.Cube.QyWeixin</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
