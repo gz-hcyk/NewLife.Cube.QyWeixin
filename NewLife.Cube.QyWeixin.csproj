@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>NewLife.Cube.QyWeixin</RootNamespace>
+    <AssemblyName>NewLife.Cube.QyWeixin</AssemblyName>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageOutputPath>nupkg</PackageOutputPath>
+
+    <!-- NuGet 包元数据 -->
+    <PackageId>NewLife.Cube.QyWeixin</PackageId>
+    <Version>1.0.2026.0924</Version>
+    <Authors>NewLife</Authors>
+    <Company>NewLife</Company>
+    <Copyright>版权所有(C) NewLife 2026</Copyright>
+    <Description>企业微信扩展 for NewLife.Cube 魔方：应用消息发送（text/textcard/template_card/update_taskcard）、通讯录同步定时作业、「接收消息」通用回调端点（WXBizMsgCrypt 验签加解密 + IQyWeixinEventHandler 事件分发）。凭据走魔方 OAuth 配置（AppId 写 corp#agent 复合写法）或显式参数，零业务依赖。</Description>
+    <PackageTags>NewLife;Cube;魔方;企业微信;WeCom;QyWeixin;TemplateCard;CronJob</PackageTags>
+    <RepositoryUrl>https://github.com/NewLifeX/NewLife.Cube.QyWeixin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NewLife.Cube.Core" Version="6.15.2026.901" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
