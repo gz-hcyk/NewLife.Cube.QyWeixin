@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using NewLife.Cube.QyWeixin;
 using Xunit;
@@ -31,8 +32,15 @@ public class QyWeixinCallbackDiscoveryTests : IClassFixture<WebApplicationFactor
             .ToList();
 
         Assert.Equal(2, actions.Count);
-        Assert.All(actions, d => Assert.Equal("/QyWeixin/Callback", d.AttributeRouteInfo?.Template));
+        // [Route("/QyWeixin/Callback")] 写入动作表时前导斜杠会被去掉，匹配路径仍是站点根下的 /QyWeixin/Callback
+        Assert.All(actions, d => Assert.Equal("QyWeixin/Callback", d.AttributeRouteInfo?.Template));
         Assert.Contains(actions, d => d.ActionName == "Verify");
         Assert.Contains(actions, d => d.ActionName == "Event");
+
+        var endpoints = _factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText == "QyWeixin/Callback")
+            .ToList();
+        Assert.Equal(2, endpoints.Count);
     }
 }
