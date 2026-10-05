@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    CubeHost=Mvc（默认）依赖 NewLife.Cube.Core，包名 NewLife.Cube.QyWeixin。
+    CubeHost=WebApi 依赖 NewLife.Cube，包名 NewLife.Cube.QyWeixin.WebApi。
+    两个魔方包程序集名都是 NewLife.Cube，obj 里的 assets 必须分开，否则还原结果会串。
+  -->
+  <PropertyGroup>
+    <CubeHost Condition="'$(CubeHost)' == ''">Mvc</CubeHost>
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)/obj/$(CubeHost)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildProjectDirectory)/bin/$(CubeHost)/</BaseOutputPath>
+    <MSBuildProjectExtensionsPath>$(MSBuildProjectDirectory)/obj/$(CubeHost)/</MSBuildProjectExtensionsPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**;**/nupkg/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

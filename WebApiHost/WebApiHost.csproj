@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>WebApiHost</RootNamespace>
+    <!-- 测试用最小 Web 宿主。不调用 AddApplicationPart，用来确认 SDK 会把本库收进 ApplicationPart。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewLife.Cube.QyWeixin.csproj" />
+  </ItemGroup>
+
+</Project>

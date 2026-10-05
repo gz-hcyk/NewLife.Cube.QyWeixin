@@ -8,15 +8,15 @@
     <RootNamespace>NewLife.Cube.QyWeixin</RootNamespace>
     <AssemblyName>NewLife.Cube.QyWeixin</AssemblyName>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <PackageOutputPath>nupkg</PackageOutputPath>
+    <PackageOutputPath>$(MSBuildProjectDirectory)/nupkg/</PackageOutputPath>
 
-    <!-- NuGet 包元数据 -->
+    <!-- NuGet 包元数据。WebApi 宿主在下方按 CubeHost 改 PackageId。 -->
     <PackageId>NewLife.Cube.QyWeixin</PackageId>
-    <Version>1.1.2026.1005</Version>
+    <Version>1.2.2026.1005</Version>
     <Authors>NewLife</Authors>
     <Company>NewLife</Company>
     <Copyright>版权所有(C) NewLife 2026</Copyright>
-    <Description>企业微信自建应用扩展 for NewLife.Cube：应用消息（text/image/voice/video/file/textcard/news/mpnews/markdown/miniprogram_notice/template_card、撤回、模板卡片更新）、临时素材、被动回复、应用与菜单、网页授权与 JS-SDK 签名、userid/openid 转换、通讯录部门/成员/标签写入与异步任务、应用群聊、工作台、日程/打卡/审批薄封装。不含客户联系。凭据走显式参数或魔方 OAuth（AppId 写 corp#agent）。</Description>
+    <Description>企业微信自建应用扩展 for NewLife.Cube：应用消息（text/image/voice/video/file/textcard/news/mpnews/markdown/miniprogram_notice/template_card、撤回、模板卡片更新）、临时素材、被动回复、应用与菜单、网页授权与 JS-SDK 签名、userid/openid 转换、通讯录部门/成员/标签写入与异步任务、应用群聊、工作台、日程/打卡/审批薄封装。不含客户联系。凭据走显式参数或魔方 OAuth（AppId 写 corp#agent）。供 MVC 宿主使用，依赖 NewLife.Cube.Core。WebApi 宿主请安装 NewLife.Cube.QyWeixin.WebApi。</Description>
     <PackageTags>NewLife;Cube;魔方;企业微信;WeCom;QyWeixin;TemplateCard;CronJob;JS-SDK</PackageTags>
     <RepositoryUrl>https://github.com/gz-hcyk/NewLife.Cube.QyWeixin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -25,16 +25,33 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="" />
-    <Compile Remove="XUnitTest/**" />
-    <None Remove="XUnitTest/**" />
-    <Content Remove="XUnitTest/**" />
-  </ItemGroup>
+  <!-- 与 MVC 包同一源码。只改包身份和魔方依赖，公开 API 不变。 -->
+  <PropertyGroup Condition="'$(CubeHost)' == 'WebApi'">
+    <PackageId>NewLife.Cube.QyWeixin.WebApi</PackageId>
+    <Description>企业微信自建应用扩展 for NewLife.Cube：应用消息（text/image/voice/video/file/textcard/news/mpnews/markdown/miniprogram_notice/template_card、撤回、模板卡片更新）、临时素材、被动回复、应用与菜单、网页授权与 JS-SDK 签名、userid/openid 转换、通讯录部门/成员/标签写入与异步任务、应用群聊、工作台、日程/打卡/审批薄封装。不含客户联系。凭据走显式参数或魔方 OAuth（AppId 写 corp#agent）。供 WebApi 宿主使用，依赖 NewLife.Cube。MVC 宿主请安装 NewLife.Cube.QyWeixin。</Description>
+    <PackageTags>$(PackageTags);WebApi</PackageTags>
+  </PropertyGroup>
 
   <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <Compile Remove="XUnitTest/**;WebApiHost/**" />
+    <None Remove="XUnitTest/**;WebApiHost/**" />
+    <Content Remove="XUnitTest/**;WebApiHost/**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(CubeHost)' == 'WebApi'">
+    <PackageReference Include="NewLife.Cube" Version="6.15.2026.901" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CubeHost)' != 'WebApi'">
     <PackageReference Include="NewLife.Cube.Core" Version="6.15.2026.901" />
+  </ItemGroup>
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+
+  <Target Name="ValidateCubeHost" BeforeTargets="CollectPackageReferences;Restore;Build;Pack">
+    <Error Condition="'$(CubeHost)' != 'Mvc' and '$(CubeHost)' != 'WebApi'"
+           Text="CubeHost 只能是 Mvc 或 WebApi，当前值为 '$(CubeHost)'。" />
+  </Target>
 
 </Project>
