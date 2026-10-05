@@ -28,12 +28,47 @@ public class QyWeixinJobArgument
     [DisplayName("请求参数")]
     [Description("兼容旧配置。Body 为 JSON：CorpID / AgentID / Secret；新配置请直接填写上方三项")]
     public String Body { get; set; }
+
+    /// <summary>
+    /// 拉取策略。默认 Upsert：企微为准，覆盖本地已映射字段。
+    /// InsertOnly：只补本地没有的部门/人员，不改已有记录。
+    /// 本作业从不调用通讯录写接口，不会把本地数据推回企微。
+    /// </summary>
+    [DisplayName("拉取策略")]
+    [Description("Upsert=企微覆盖本地映射字段；InsertOnly=只插入本地不存在的部门/人员")]
+    public QyWeixinPullMode PullMode { get; set; } = QyWeixinPullMode.Upsert;
+}
+
+/// <summary>
+/// 定时同步只从企微拉到魔方，方向固定。
+/// 写接口（<see cref="QyWeixinClient"/> 的部门/成员/标签）只推到企微，不改本地 Department/User。
+/// 两边同时用时：企微是组织数据的远端事实来源；Upsert 会在下次作业里把远端变更写进魔方映射字段
+/// （部门名、上级、排序、启用，以及人员显示名、启用、主部门）。它不会反向覆盖企微。
+/// 若魔方里这些字段有人手改、不希望被下次同步盖住，把 PullMode 设为 InsertOnly，或停用本作业。
+/// </summary>
+public enum QyWeixinPullMode
+{
+    /// <summary>已有本地记录也按企微更新映射字段</summary>
+    Upsert = 0,
+
+    /// <summary>只插入本地不存在的部门/人员</summary>
+    InsertOnly = 1,
+}
+
+/// <summary>同步冲突策略的可测试入口。作业本身不写企微</summary>
+public static class QyWeixinSyncPolicy
+{
+    /// <summary>该模式下是否允许更新已存在的本地部门/人员</summary>
+    /// <param name="mode">拉取策略</param>
+    /// <returns>Upsert 为 true，InsertOnly 为 false</returns>
+    public static Boolean ShouldUpdateExisting(QyWeixinPullMode mode) => mode != QyWeixinPullMode.InsertOnly;
 }
 
 /// <summary>
 /// 从企业微信拉取部门与人员，写入魔方 <see cref="Department"/> / <see cref="User"/>。
 /// 凭据优先作业参数（含旧 Body JSON），缺省回退魔方 OAuth 配置中的企业微信条目。
 /// 企微 userid 落为 <see cref="User.Name"/>，企微部门 Id 落为 <see cref="Department.Code"/>。
+/// 只读拉取，不调用通讯录写接口。与写接口的冲突策略见 <see cref="QyWeixinPullMode"/>。
 /// </summary>
 [DisplayName("企业微信定时任务")]
 [Description("从企业微信定时拉取组织和人员信息")]
@@ -60,18 +95,19 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
         if (remoteDepts == null || remoteDepts.Length == 0)
             return $"[{DateTime.Now}]企业微信未返回部门，跳过人员同步";
 
-        var deptMap = SyncDepartments(remoteDepts);
+        var mode = argument?.PullMode ?? QyWeixinPullMode.Upsert;
+        var deptMap = SyncDepartments(remoteDepts, mode);
 
         var root = remoteDepts.FirstOrDefault(d => IsRootParent(d.ParentId)) ?? remoteDepts[0];
         var remoteUsers = await client.GetUsers(root.Id, true).ConfigureAwait(false);
 
-        var userCount = SyncUsers(remoteUsers, deptMap);
+        var userCount = SyncUsers(remoteUsers, deptMap, mode);
 
         return $"[{DateTime.Now}]企业微信通讯录同步完成：部门{deptMap.Count} 人员{userCount}";
     }
 
     /// <summary>按父部门优先的顺序写入本地部门，并回填名称 / 上级 / 层级 / 排序。</summary>
-    private static IDictionary<String, Department> SyncDepartments(NewLife.Cube.Web.Models.DepartmentInfo[] remoteDepts)
+    private static IDictionary<String, Department> SyncDepartments(NewLife.Cube.Web.Models.DepartmentInfo[] remoteDepts, QyWeixinPullMode mode)
     {
         var remaining = remoteDepts.Where(d => !d.Id.IsNullOrEmpty()).ToList();
         var map = new Dictionary<String, Department>(StringComparer.OrdinalIgnoreCase);
@@ -85,7 +121,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
                 var info = remaining[i];
                 if (!CanSaveDepartment(info, map)) continue;
 
-                map[info.Id] = UpsertDepartment(info, map);
+                map[info.Id] = UpsertDepartment(info, map, mode);
                 remaining.RemoveAt(i);
                 progress++;
             }
@@ -93,7 +129,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
             if (progress == 0)
             {
                 foreach (var info in remaining)
-                    map[info.Id] = UpsertDepartment(info, map);
+                    map[info.Id] = UpsertDepartment(info, map, mode);
                 break;
             }
         }
@@ -109,9 +145,12 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
     }
 
     /// <summary>按企微部门 Id（Code）查找或新建本地部门，并更新名称、上级、层级、排序。</summary>
-    private static Department UpsertDepartment(NewLife.Cube.Web.Models.DepartmentInfo info, IDictionary<String, Department> map)
+    private static Department UpsertDepartment(NewLife.Cube.Web.Models.DepartmentInfo info, IDictionary<String, Department> map, QyWeixinPullMode mode)
     {
-        var dep = Department.FindByCode(info.Id) ?? new Department
+        var dep = Department.FindByCode(info.Id);
+        if (dep != null && !QyWeixinSyncPolicy.ShouldUpdateExisting(mode)) return dep;
+
+        dep ??= new Department
         {
             Code = info.Id,
             Enable = true,
@@ -140,7 +179,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
 
     /// <summary>按企微 userid 写入本地用户；部门取主部门，避免多部门用户被后处理的部门覆盖。</summary>
     /// <returns>成功保存的人数</returns>
-    private static Int32 SyncUsers(NewLife.Cube.Web.Models.UserInfo[] remoteUsers, IDictionary<String, Department> deptMap)
+    private static Int32 SyncUsers(NewLife.Cube.Web.Models.UserInfo[] remoteUsers, IDictionary<String, Department> deptMap, QyWeixinPullMode mode)
     {
         if (remoteUsers == null || remoteUsers.Length == 0) return 0;
 
@@ -152,6 +191,9 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
             if (info.Id.IsNullOrEmpty() || !seen.Add(info.Id)) continue;
 
             var user = User.FindByName(info.Id);
+            if (user != null && !QyWeixinSyncPolicy.ShouldUpdateExisting(mode))
+                continue;
+
             if (user == null)
             {
                 user = new User

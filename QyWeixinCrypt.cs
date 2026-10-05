@@ -33,19 +33,26 @@ public class QyWeixinCrypt
         _aesKey = key;
     }
 
-    /// <summary>校验消息签名。msg_signature = SHA1(字典序排序(token, timestamp, nonce, encryptMsg) 拼接)</summary>
+    /// <summary>计算消息签名。msg_signature = SHA1(字典序排序(token, timestamp, nonce, encryptMsg) 拼接)</summary>
+    /// <param name="timestamp">时间戳</param>
+    /// <param name="nonce">随机串</param>
+    /// <param name="encryptMsg">密文（GET 的 echostr 或 POST 报文的 Encrypt）</param>
+    /// <returns>十六进制小写签名</returns>
+    public String Sign(String timestamp, String nonce, String encryptMsg)
+    {
+        var plain = String.Join("", new[] { _token, timestamp, nonce, encryptMsg }.OrderBy(s => s, StringComparer.Ordinal));
+        var hash = SHA1.HashData(Encoding.UTF8.GetBytes(plain));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    /// <summary>校验消息签名</summary>
     /// <param name="timestamp">时间戳</param>
     /// <param name="nonce">随机串</param>
     /// <param name="encryptMsg">密文（GET 的 echostr 或 POST 报文的 Encrypt）</param>
     /// <param name="signature">待校验的 msg_signature</param>
     /// <returns>true=签名一致</returns>
     public Boolean VerifySignature(String timestamp, String nonce, String encryptMsg, String signature)
-    {
-        var plain = String.Join("", new[] { _token, timestamp, nonce, encryptMsg }.OrderBy(s => s, StringComparer.Ordinal));
-        var hash = SHA1.HashData(Encoding.UTF8.GetBytes(plain));
-        var expected = Convert.ToHexString(hash).ToLowerInvariant();
-        return expected.EqualIgnoreCase(signature);
-    }
+        => Sign(timestamp, nonce, encryptMsg).EqualIgnoreCase(signature);
 
     /// <summary>
     /// 解密消息体并拆包，返回明文与消息尾部的 receiveid。
@@ -69,10 +76,13 @@ public class QyWeixinCrypt
         return (msg, receiveId);
     }
 
-    /// <summary>解密 URL 验证的 echostr（无消息体封装，直接 AES 解密去填充）。</summary>
+    /// <summary>
+    /// 解密 URL 验证的 echostr。官方与普通消息同一封装：random(16) + len + 明文 + receiveid。
+    /// 回显的是拆包后的明文，而不是含随机头的整段。
+    /// </summary>
     /// <param name="encrypted">Base64 密文</param>
     /// <returns>明文 echostr，原样回显即完成 URL 验证</returns>
-    public String DecryptEcho(String encrypted) => Encoding.UTF8.GetString(DecryptRaw(encrypted));
+    public String DecryptEcho(String encrypted) => Decrypt(encrypted).Message;
 
     /// <summary>AES 解密 + 去 PKCS7 填充（供消息体拆包与 echostr 共用）。</summary>
     private Byte[] DecryptRaw(String encrypted)
@@ -120,5 +130,30 @@ public class QyWeixinCrypt
 
         using var encryptor = aes.CreateEncryptor();
         return Convert.ToBase64String(encryptor.TransformFinalBlock(ms.GetBuffer(), 0, (Int32)ms.Length));
+    }
+
+    /// <summary>
+    /// 把被动回复明文打成企微要求的加密 XML。
+    /// 文档 https://developer.work.weixin.qq.com/document/path/90241
+    /// 需要构造时传入的 corpId 作为 receiveid。
+    /// </summary>
+    /// <param name="plainXml">QyWeixinReply 生成的明文</param>
+    /// <param name="timestamp">时间戳，可沿用回调 URL 上的 timestamp</param>
+    /// <param name="nonce">随机串，可沿用回调 URL 上的 nonce</param>
+    /// <returns>含 Encrypt、MsgSignature、TimeStamp、Nonce 的 XML</returns>
+    public String BuildEncryptedReply(String plainXml, String timestamp, String nonce)
+    {
+        if (plainXml.IsNullOrEmpty()) throw new ArgumentNullException(nameof(plainXml));
+        if (timestamp.IsNullOrEmpty()) throw new ArgumentNullException(nameof(timestamp));
+        if (nonce.IsNullOrEmpty()) throw new ArgumentNullException(nameof(nonce));
+
+        var encrypt = Encrypt(plainXml);
+        var signature = Sign(timestamp, nonce, encrypt);
+        return new System.Xml.Linq.XElement("xml",
+            new System.Xml.Linq.XElement("Encrypt", new System.Xml.Linq.XCData(encrypt)),
+            new System.Xml.Linq.XElement("MsgSignature", new System.Xml.Linq.XCData(signature)),
+            new System.Xml.Linq.XElement("TimeStamp", timestamp),
+            new System.Xml.Linq.XElement("Nonce", new System.Xml.Linq.XCData(nonce))
+        ).ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
     }
 }
