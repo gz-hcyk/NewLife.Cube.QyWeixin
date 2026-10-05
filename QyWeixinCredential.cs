@@ -70,8 +70,12 @@ public static class QyWeixinCredential
         return (null, null);
     }
 
-    /// <summary>解析 API 客户端（QyWeiXin，用于通讯录等只读接口）。</summary>
+    /// <summary>
+    /// 解析自建应用 API 客户端。实例是 <see cref="QyWeixinClient"/>，返回类型保持 <see cref="QyWeiXin"/> 以免破坏既有调用。
+    /// 需要发送、通讯录写、JS-SDK 等方法时，把结果转成 <see cref="QyWeixinClient"/>，或直接用 <see cref="ResolveApi"/>。
+    /// </summary>
     /// <param name="options">显式凭据，null 或不全时走 OAuth 配置</param>
+    /// <returns>客户端与凭据来源</returns>
     public static (QyWeiXin Client, String Source) ResolveClient(QyWeixinOptions options)
     {
         if (options != null && !options.CorpID.IsNullOrEmpty() && !options.Secret.IsNullOrEmpty())
@@ -97,6 +101,15 @@ public static class QyWeixinCredential
         return (null, null);
     }
 
+    /// <summary>解析自建应用 API 客户端（消息、素材、应用、通讯录写、群聊、日程等）。</summary>
+    /// <param name="options">显式凭据，null 或不全时走 OAuth 配置</param>
+    /// <returns>客户端（无凭据时为 null）与来源说明</returns>
+    public static (QyWeixinClient Client, String Source) ResolveApi(QyWeixinOptions options)
+    {
+        var (client, source) = ResolveClient(options);
+        return (client as QyWeixinClient, source);
+    }
+
     /// <summary>在魔方 OAuth 配置（OAuthConfig 表）中查找已启用的企业微信条目：优先按 Provider=QyWeiXin 匹配，其次按名称包含“企业微信”或 QyWeiXin。</summary>
     public static OAuthConfig FindOAuthConfig()
     {
@@ -116,7 +129,7 @@ public static class QyWeixinCredential
 
     private static QyWeiXin CreateClient(String corpId, String secret, String agentId)
     {
-        var client = new QyWeiXin
+        var client = new QyWeixinClient
         {
             CorpId = corpId,
             Secret = secret,

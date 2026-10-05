@@ -12,12 +12,12 @@
 
     <!-- NuGet 包元数据 -->
     <PackageId>NewLife.Cube.QyWeixin</PackageId>
-    <Version>1.0.2026.0924</Version>
+    <Version>1.1.2026.1005</Version>
     <Authors>NewLife</Authors>
     <Company>NewLife</Company>
     <Copyright>版权所有(C) NewLife 2026</Copyright>
-    <Description>企业微信扩展 for NewLife.Cube 魔方：应用消息发送（text/textcard/template_card/update_taskcard）、通讯录同步定时作业、「接收消息」通用回调端点（WXBizMsgCrypt 验签加解密 + IQyWeixinEventHandler 事件分发）。凭据走魔方 OAuth 配置（AppId 写 corp#agent 复合写法）或显式参数，零业务依赖。</Description>
-    <PackageTags>NewLife;Cube;魔方;企业微信;WeCom;QyWeixin;TemplateCard;CronJob</PackageTags>
+    <Description>企业微信自建应用扩展 for NewLife.Cube：应用消息（text/image/voice/video/file/textcard/news/mpnews/markdown/miniprogram_notice/template_card、撤回、模板卡片更新）、临时素材、被动回复、应用与菜单、网页授权与 JS-SDK 签名、userid/openid 转换、通讯录部门/成员/标签写入与异步任务、应用群聊、工作台、日程/打卡/审批薄封装。不含客户联系。凭据走显式参数或魔方 OAuth（AppId 写 corp#agent）。</Description>
+    <PackageTags>NewLife;Cube;魔方;企业微信;WeCom;QyWeixin;TemplateCard;CronJob;JS-SDK</PackageTags>
     <RepositoryUrl>https://github.com/gz-hcyk/NewLife.Cube.QyWeixin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/gz-hcyk/NewLife.Cube.QyWeixin</PackageProjectUrl>
@@ -27,6 +27,9 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="" />
+    <Compile Remove="XUnitTest/**" />
+    <None Remove="XUnitTest/**" />
+    <Content Remove="XUnitTest/**" />
   </ItemGroup>
 
   <ItemGroup>
