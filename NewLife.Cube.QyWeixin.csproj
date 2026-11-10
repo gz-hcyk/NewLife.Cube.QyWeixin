@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- net6.0 已停止官方支持，仍保留兼容目标，不在构建时输出 EOL 警告 -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <RootNamespace>NewLife.Cube.QyWeixin</RootNamespace>
     <AssemblyName>NewLife.Cube.QyWeixin</AssemblyName>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
