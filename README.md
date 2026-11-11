@@ -8,10 +8,12 @@
 
 同一份源码打两个包，程序集名都是 `NewLife.Cube.QyWeixin`，公开 API 相同。`NewLife.Cube` 与 `NewLife.Cube.Core` 的程序集名都是 `NewLife.Cube`，一个宿主只能装其中一组。
 
-| 宿主 | 魔方包 | 本库 |
-|---|---|---|
-| MVC（Razor，工程 `NewLife.CubeNC`） | `NewLife.Cube.Core` | `NewLife.Cube.QyWeixin` |
-| WebApi（工程 `NewLife.Cube`） | `NewLife.Cube` | `NewLife.Cube.QyWeixin.WebApi` |
+| 宿主 | 魔方包 | 本库 | 本库工程 |
+|---|---|---|---|
+| MVC（Razor，工程 `NewLife.CubeNC`） | `NewLife.Cube.Core` | `NewLife.Cube.QyWeixin` | `src/NewLife.Cube.QyWeixin.Mvc` |
+| WebApi（工程 `NewLife.Cube`） | `NewLife.Cube` | `NewLife.Cube.QyWeixin.WebApi` | `src/NewLife.Cube.QyWeixin.WebApi` |
+
+两个工程都通过 `Compile Include` 链接 `src/Shared` 下的同一份源码，没有复制代码。根目录 `NewLife.Cube.QyWeixin.sln` 同时包含两个包工程、测试工程和测试宿主。
 
 ```bash
 # MVC 宿主
@@ -21,6 +23,20 @@ dotnet add package NewLife.Cube.QyWeixin
 # WebApi 宿主
 dotnet add package NewLife.Cube
 dotnet add package NewLife.Cube.QyWeixin.WebApi
+```
+
+## 源码结构
+
+```
+NewLife.Cube.QyWeixin.sln
+src/
+  Shared/                        共享源码，两个包工程链接同一批 .cs
+  NewLife.Cube.QyWeixin.Mvc/     MVC 包工程，依赖 NewLife.Cube.Core
+  NewLife.Cube.QyWeixin.WebApi/  WebApi 包工程，依赖 NewLife.Cube
+test/
+  XUnitTest/                     单元测试，引用 MVC 包工程
+  WebApiHost/                    最小 Web 宿主，验证回调控制器发现
+Doc/                             需求、功能清单、架构设计
 ```
 
 回调端点 `QyWeixinCallbackController` 继承 `ControllerBase`，路由 `/QyWeixin/Callback`。WebApi 的 `AddCube` 不登记 `ApplicationPart`；MVC 的 `AddCube` 只收集含 `ControllerBaseX` 或 Razor 页的程序集。发现由 ASP.NET Core Web SDK 完成：宿主工程（`Microsoft.NET.Sdk.Web`）直接引用上表对应的包，并调用 `AddControllers()`（WebApi）或 `AddControllersWithViews()`（MVC）时，SDK 会写入 `ApplicationPartAttribute`，端点随 `AddCube` / `UseCube` 的常规启动进入路由。若只有普通类库引用本包、Web 工程的引用闭包里看不到本程序集，在 `AddControllers()` 上补：
@@ -143,20 +159,18 @@ JS-SDK：`CreateConfigSignatureAsync` / `CreateAgentConfigSignatureAsync`。tick
 
 ## 打包与测试
 
-默认 `CubeHost=Mvc`。两个味道各还原一次，中间目录分别在 `obj/Mvc` 与 `obj/WebApi`。
-
 ```bash
-dotnet test XUnitTest/XUnitTest.csproj -p:CubeHost=Mvc
-dotnet test XUnitTest/XUnitTest.csproj -p:CubeHost=WebApi
+dotnet build NewLife.Cube.QyWeixin.sln
+dotnet test NewLife.Cube.QyWeixin.sln --no-build
 
-dotnet pack -c Release -p:CubeHost=Mvc
-dotnet pack -c Release -p:CubeHost=WebApi
+dotnet pack src/NewLife.Cube.QyWeixin.Mvc -c Release
+dotnet pack src/NewLife.Cube.QyWeixin.WebApi -c Release
 # 产物：
 #   nupkg/NewLife.Cube.QyWeixin.<版本>.nupkg          依赖 NewLife.Cube.Core
 #   nupkg/NewLife.Cube.QyWeixin.WebApi.<版本>.nupkg   依赖 NewLife.Cube
 ```
 
-魔方依赖版本 `6.15.2026.901`，目标框架 `net6.0` / `net8.0`。单测不访问企微网络，覆盖加解密、签名、消息体、回调解析、授权 URL，以及 Web 宿主对回调控制器的发现。
+单测引用 MVC 包工程；WebApi 包工程随解决方案一起编译、单独打包，两者共享 `src/Shared` 同一份源码，差异只在魔方依赖。魔方依赖版本 `6.15.2026.901`，目标框架 `net6.0` / `net8.0`。单测不访问企微网络，覆盖加解密、签名、消息体、回调解析、授权 URL，以及 Web 宿主对回调控制器的发现。
 
 ## 参考实现
 

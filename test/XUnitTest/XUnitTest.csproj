@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>XUnitTest</RootNamespace>
   </PropertyGroup>
@@ -16,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NewLife.Cube.QyWeixin.csproj" />
+    <ProjectReference Include="..\..\src\NewLife.Cube.QyWeixin.Mvc\NewLife.Cube.QyWeixin.Mvc.csproj" />
     <ProjectReference Include="..\WebApiHost\WebApiHost.csproj" />
   </ItemGroup>
 

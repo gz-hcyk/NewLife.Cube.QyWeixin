@@ -229,6 +229,104 @@ public partial class QyWeixinClient
         return await GetJsonAsync("department/get", new { access_token = token, id }).ConfigureAwait(false);
     }
 
+    /// <summary>获取部门列表。保留原始 department 节点字段，便于调用方自行映射</summary>
+    /// <param name="id">部门 id。0 或 null 表示全量组织架构</param>
+    /// <returns>部门字典数组</returns>
+    public async Task<IDictionary<String, Object>[]> GetDepartmentsAsync(Int32? id = null)
+    {
+        var token = await TokenAsync().ConfigureAwait(false);
+        var args = new Dictionary<String, Object> { ["access_token"] = token };
+        if (id != null && id.Value > 0) args["id"] = id.Value;
+
+        var raw = await GetJsonAsync("department/list", args).ConfigureAwait(false);
+        return PickArray(raw, "department");
+    }
+
+    /// <summary>获取指定部门及其子部门的 id 列表。文档 https://developer.work.weixin.qq.com/document/path/90209</summary>
+    /// <param name="id">部门 id。0 或不传表示全量组织架构</param>
+    /// <returns>部门 id 数组</returns>
+    public async Task<Int32[]> GetDepartmentChildrenIdsAsync(Int32 id = 0)
+    {
+        var token = await TokenAsync().ConfigureAwait(false);
+        var args = new Dictionary<String, Object> { ["access_token"] = token };
+        if (id > 0) args["id"] = id;
+
+        var raw = await GetJsonAsync("department/simplelist", args).ConfigureAwait(false);
+        return PickArray(raw, "department_id")
+            .Select(e => QyWeixinValues.PickInt(e, "id"))
+            .Where(e => e > 0)
+            .ToArray();
+    }
+
+    /// <summary>获取部门成员详情。文档 https://developer.work.weixin.qq.com/document/path/90201</summary>
+    /// <param name="departmentId">部门 id</param>
+    /// <param name="fetchChild">是否递归获取子部门成员</param>
+    /// <returns>成员字典数组</returns>
+    public async Task<IDictionary<String, Object>[]> GetDepartmentUsersAsync(Int32 departmentId, Boolean fetchChild = false)
+    {
+        var token = await TokenAsync().ConfigureAwait(false);
+        var raw = await GetJsonAsync("user/list", new { access_token = token, department_id = departmentId, fetch_child = fetchChild ? 1 : 0 }).ConfigureAwait(false);
+        return PickArray(raw, "userlist");
+    }
+
+    /// <summary>获取标签成员 userid 列表。文档 https://developer.work.weixin.qq.com/document/path/90213</summary>
+    /// <param name="tagId">标签 id</param>
+    /// <returns>userid 数组</returns>
+    public async Task<String[]> GetTagUserIdsAsync(Int32 tagId)
+    {
+        var token = await TokenAsync().ConfigureAwait(false);
+        var raw = await GetJsonAsync("tag/get", new { access_token = token, tagid = tagId }).ConfigureAwait(false);
+        return PickArray(raw, "userlist")
+            .Select(e => QyWeixinValues.Pick(e, "userid"))
+            .Where(e => !e.IsNullOrEmpty())
+            .ToArray();
+    }
+
+    /// <summary>获取加入企业二维码。文档 https://developer.work.weixin.qq.com/document/path/90257</summary>
+    /// <param name="sizeType">尺寸。1：171x171，2：399x399，3：741x741，4：2052x2052</param>
+    /// <returns>二维码链接</returns>
+    public async Task<String> GetJoinQrCodeAsync(Int32 sizeType = 1)
+    {
+        if (sizeType < 1 || sizeType > 4) sizeType = 1;
+
+        var token = await TokenAsync().ConfigureAwait(false);
+        var raw = await GetJsonAsync("corp/get_join_qrcode", new { access_token = token, size_type = sizeType }).ConfigureAwait(false);
+        return QyWeixinValues.Pick(raw, "join_qrcode");
+    }
+
+    /// <summary>二次验证通过。文档 https://developer.work.weixin.qq.com/document/path/90241</summary>
+    /// <param name="userId">成员 userid</param>
+    /// <returns>验证任务</returns>
+    public async Task AuthSuccessAsync(String userId)
+    {
+        if (userId.IsNullOrEmpty()) throw new ArgumentNullException(nameof(userId));
+
+        var token = await TokenAsync().ConfigureAwait(false);
+        await GetJsonAsync("user/authsucc", new { access_token = token, userid = userId }).ConfigureAwait(false);
+    }
+
+    private static IDictionary<String, Object>[] PickArray(IDictionary<String, Object> raw, String name)
+    {
+        if (raw == null || !raw.TryGetValue(name, out var value) || value == null)
+            return Array.Empty<IDictionary<String, Object>>();
+
+        if (value is IEnumerable<Object> items)
+            return items.OfType<IDictionary<String, Object>>().ToArray();
+
+        return Array.Empty<IDictionary<String, Object>>();
+    }
+
+    /// <summary>获取成员详情。文档 https://developer.work.weixin.qq.com/document/path/90196</summary>
+    /// <param name="userId">成员 userid</param>
+    /// <returns>成员对象，以 Raw 方式返回整包</returns>
+    public async Task<IDictionary<String, Object>> GetMemberAsync(String userId)
+    {
+        if (userId.IsNullOrEmpty()) throw new ArgumentNullException(nameof(userId));
+
+        var token = await TokenAsync().ConfigureAwait(false);
+        return await GetJsonAsync("user/get", new { access_token = token, userid = userId }).ConfigureAwait(false);
+    }
+
     /// <summary>创建成员。不写魔方 User</summary>
     /// <param name="member">成员</param>
     /// <returns>创建任务</returns>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>WebApiHost</RootNamespace>
+    <!-- 测试用最小 Web 宿主。不调用 AddApplicationPart，用来确认 SDK 会把本库收进 ApplicationPart。
+         必须与 XUnitTest 引用同一个包工程：两个包的程序集名都是 NewLife.Cube.QyWeixin，不能同时进一个输出目录。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NewLife.Cube.QyWeixin.Mvc\NewLife.Cube.QyWeixin.Mvc.csproj" />
+  </ItemGroup>
+
+</Project>

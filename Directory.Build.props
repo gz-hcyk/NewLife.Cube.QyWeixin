@@ -1,14 +1,14 @@
 <Project>
   <!--
-    CubeHost=Mvc（默认）依赖 NewLife.Cube.Core，包名 NewLife.Cube.QyWeixin。
-    CubeHost=WebApi 依赖 NewLife.Cube，包名 NewLife.Cube.QyWeixin.WebApi。
-    两个魔方包程序集名都是 NewLife.Cube，obj 里的 assets 必须分开，否则还原结果会串。
+    src/Shared 是 MVC 与 WebApi 两个包的共享源码。
+    两个工程分别引用 NewLife.Cube.Core / NewLife.Cube，程序集名都是 NewLife.Cube.QyWeixin。
   -->
   <PropertyGroup>
-    <CubeHost Condition="'$(CubeHost)' == ''">Mvc</CubeHost>
-    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)/obj/$(CubeHost)/</BaseIntermediateOutputPath>
-    <BaseOutputPath>$(MSBuildProjectDirectory)/bin/$(CubeHost)/</BaseOutputPath>
-    <MSBuildProjectExtensionsPath>$(MSBuildProjectDirectory)/obj/$(CubeHost)/</MSBuildProjectExtensionsPath>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- net6.0 已停止官方支持，仍保留兼容目标，不在构建时输出 EOL 警告 -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**;**/nupkg/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>
