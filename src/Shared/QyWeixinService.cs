@@ -50,7 +50,7 @@ public class QyWeixinJobArgument
 
 /// <summary>
 /// 定时同步只从企微拉到魔方，方向固定。
-/// 本地魔方部门是组织主数据，作业只建立“外部部门 → 本地部门”的映射，绝不创建或修改本地部门。
+/// 部门优先建立“外部部门 → 本地部门”的映射；没有映射且本地不存在时创建，已有本地部门不做修改。
 /// 人员仍按 <see cref="QyWeixinPullMode"/> 决定是否覆盖本地显示名、启用和主部门。
 /// 写接口（<see cref="QyWeixinClient"/> 的部门/成员/标签）只推到企微，不改本地 Department/User。
 /// </summary>
@@ -74,9 +74,11 @@ public static class QyWeixinSyncPolicy
 
 /// <summary>
 /// 从企业微信拉取部门与人员，把外部身份写入 <see cref="OrgExternalMap"/>。
-/// 本地部门是主数据：企微部门只挂接到已有本地部门，首次按完整名称路径自动匹配，匹配不上的只报告不落库。
-/// 人员按映射表、手机、邮箱、历史同名单步归并，并把绑定固化到映射表。
-/// 凭据优先作业参数（含旧 Body JSON），缺省回退魔方 OAuth 配置中的企业微信条目。
+/// 部门优先按映射挂接；没有映射时按完整路径匹配（含去掉源根名的短路径），
+/// 仍未命中时在映射父级下按同级同名挂接，仍找不到则创建，
+/// 已有本地部门不做修改。企微部门 Id 始终以字符串保存在映射表，本地 Department.Code 保持业务编码，
+/// 不写入外部 Id，避免字符串编码与 32 位部门 Id 混用。人员按映射表、同名 userid、手机、邮箱单步归并，
+/// 并把绑定固化到映射表。凭据优先作业参数（含旧 Body JSON），缺省回退魔方 OAuth 配置中的企业微信条目。
 /// 只读拉取，不调用通讯录写接口。
 /// </summary>
 [DisplayName("企业微信定时任务")]
@@ -123,12 +125,13 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
         return $"[{DateTime.Now}]企业微信通讯录同步完成：部门 {deptResult.Summary}；人员 {userResult.Summary}";
     }
 
-    /// <summary>把外部部门映射到已有本地部门，不创建、不修改本地部门</summary>
+    /// <summary>把外部部门挂接到本地部门；没有映射且本地不存在时创建，已有本地部门不做修改</summary>
     private static DepartmentSyncResult SyncDepartments(DepartmentInfo[] remoteDepts, String provider)
     {
         var result = new DepartmentSyncResult();
         var nodes = QyWeixinOrgMatch.BuildDepartmentNodes(remoteDepts);
-        var localPaths = QyWeixinOrgMatch.BuildLocalDepartmentPaths(Department.FindAll(), TenantId);
+        var local = Department.FindAll();
+        var localPaths = QyWeixinOrgMatch.BuildLocalDepartmentPaths(local, TenantId);
 
         var maps = OrgExternalMap.FindAllByProvider(provider, OrgObjectKinds.Department, TenantId)
             .GroupBy(e => e.ExternalId, StringComparer.OrdinalIgnoreCase)
@@ -157,10 +160,16 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
             }
 
             var matched = MatchDepartment(node, localPaths, usedLocal);
+            var created = false;
+
+            // 完整路径可能因本地根名不同而失效，再按映射父级下的同级名称查找
+            matched ??= FindByLocalParent(local, node, maps, usedLocal);
+
             if (matched == null)
             {
-                if (!node.IsRoot) result.Unmapped.Add(node.Path);
-                continue;
+                matched = CreateLocalDepartment(node, maps, result);
+                if (matched == null) continue;
+                created = true;
             }
 
             map ??= new OrgExternalMap
@@ -180,7 +189,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
             maps[info.Id] = map;
             result.Map[info.Id] = matched;
             usedLocal.Add(matched.ID);
-            result.AutoMapped++;
+            if (!created) result.AutoMapped++;
         }
 
         return result;
@@ -198,6 +207,70 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
         }
 
         return null;
+    }
+
+    /// <summary>在映射到的本地父级下按同名查找；根部门退化为唯一根</summary>
+    private static Department FindByLocalParent(IList<Department> local, QyWeixinDepartmentNode node, IDictionary<String, OrgExternalMap> maps, ISet<Int32> usedLocal)
+    {
+        var parentId = GetLocalParentId(node, maps);
+        if (parentId < 0) return null;
+
+        var matches = local.Where(e => e.TenantId == TenantId && e.ParentID == parentId &&
+            e.Name.EqualIgnoreCase(node.Info.Name) && !usedLocal.Contains(e.ID)).Take(2).ToList();
+        if (matches.Count == 1) return matches[0];
+
+        // 根部门名称可能与其他系统不一致，只有一个本地根时直接挂接
+        if (node.IsRoot && matches.Count == 0)
+        {
+            var roots = local.Where(e => e.TenantId == TenantId && e.ParentID == 0 && !usedLocal.Contains(e.ID)).Take(2).ToList();
+            if (roots.Count == 1) return roots[0];
+        }
+
+        return null;
+    }
+
+    /// <summary>取外部父部门对应的本地部门编号。根部门为 0，父级尚未映射时返回 -1</summary>
+    private static Int32 GetLocalParentId(QyWeixinDepartmentNode node, IDictionary<String, OrgExternalMap> maps)
+    {
+        if (node.IsRoot) return 0;
+
+        var parentId = node.Info.ParentId;
+        if (parentId.IsNullOrEmpty()) return 0;
+
+        return maps.TryGetValue(parentId, out var map) ? map.LocalId : -1;
+    }
+
+    /// <summary>按企微部门创建本地部门。父级未映射时跳过，避免挂到错误层级</summary>
+    private static Department CreateLocalDepartment(QyWeixinDepartmentNode node, IDictionary<String, OrgExternalMap> maps, DepartmentSyncResult result)
+    {
+        var info = node.Info;
+        var parentId = GetLocalParentId(node, maps);
+        if (parentId < 0 || info.Name.IsNullOrEmpty())
+        {
+            result.Unmapped.Add(node.Path);
+            return null;
+        }
+
+        // 企微部门 Id 只写 OrgExternalMap。Code 是本地业务编码，不能被外部 Id 覆盖，也不保证能转成 Int32。
+        var department = new Department
+        {
+            TenantId = TenantId,
+            Name = info.Name,
+            ParentID = parentId,
+            Sort = info.Order,
+            Enable = true,
+            Visible = true,
+        };
+        department.Save();
+
+        if (department.ID <= 0)
+        {
+            result.Unmapped.Add(node.Path);
+            return null;
+        }
+
+        result.Created++;
+        return department;
     }
 
     private static void UpdateMap(OrgExternalMap map, DepartmentInfo info, String path)
@@ -221,9 +294,9 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
 
         var allUsers = User.FindAll();
         var byId = allUsers.ToDictionary(e => e.ID);
+        var byName = BuildUserIndex(allUsers, e => e.Name);
         var byMobile = BuildUserIndex(allUsers, e => e.Mobile);
         var byMail = BuildUserIndex(allUsers, e => e.Mail);
-        var byName = BuildUserIndex(allUsers, e => e.Name);
         var boundByLocal = userMaps.Values.Where(e => e.LocalId > 0).GroupBy(e => e.LocalId).ToDictionary(e => e.Key, e => e.First());
 
         var seen = new HashSet<String>(StringComparer.OrdinalIgnoreCase);
@@ -238,7 +311,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
 
             if (user == null)
             {
-                user = MatchUser(info, byMobile, byMail, byName, boundByLocal, out var conflict);
+                user = MatchUser(info, byName, byMobile, byMail, boundByLocal, out var conflict);
                 if (conflict != null)
                 {
                     result.Conflicts.Add(conflict);
@@ -305,13 +378,24 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
         return result;
     }
 
-    /// <summary>按手机、邮箱、历史同名依次归并。返回冲突原因时表示不能绑定该用户</summary>
-    private static User MatchUser(UserInfo info, IDictionary<String, List<User>> byMobile, IDictionary<String, List<User>> byMail, IDictionary<String, List<User>> byName, IDictionary<Int32, OrgExternalMap> boundByLocal, out String conflict)
+    /// <summary>按本地同名 userid、手机、邮箱依次归并。返回冲突原因时表示不能绑定该用户</summary>
+    private static User MatchUser(UserInfo info, IDictionary<String, List<User>> byName, IDictionary<String, List<User>> byMobile, IDictionary<String, List<User>> byMail, IDictionary<Int32, OrgExternalMap> boundByLocal, out String conflict)
     {
         conflict = null;
         User found = null;
 
-        if (!info.Mobile.IsNullOrEmpty() && byMobile.TryGetValue(info.Mobile, out var mobiles))
+        // 本地 User.Name 即企微 userid：本库新建用户以 userid 作 Name，WxWorkAgent 推送成员时也以 Name 作 userid
+        if (!info.Id.IsNullOrEmpty() && byName.TryGetValue(info.Id, out var names))
+        {
+            if (names.Count > 1)
+            {
+                conflict = $"本地存在多个同名用户：{info.Id}";
+                return null;
+            }
+            found = names[0];
+        }
+
+        if (found == null && !info.Mobile.IsNullOrEmpty() && byMobile.TryGetValue(info.Mobile, out var mobiles))
         {
             if (mobiles.Count > 1)
             {
@@ -329,24 +413,6 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
                 return null;
             }
             found = mails[0];
-        }
-
-        // 兼容旧版本：本地用户名曾经就是企微 userid
-        if (found == null && byName.TryGetValue(info.Id, out var names))
-        {
-            if (names.Count > 1)
-            {
-                conflict = $"本地存在多个同名用户：{info.Id}";
-                return null;
-            }
-
-            var legacy = names[0];
-            if (!info.Mobile.IsNullOrEmpty() && !legacy.Mobile.IsNullOrEmpty() && legacy.Mobile != info.Mobile)
-            {
-                conflict = $"userid 与本地同名用户手机不一致：{info.Id}";
-                return null;
-            }
-            found = legacy;
         }
 
         if (found != null && boundByLocal.TryGetValue(found.ID, out var other) && !other.ExternalId.EqualIgnoreCase(info.Id))
@@ -449,13 +515,14 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
         public List<String> Unmapped { get; } = new();
         public Int32 Bound { get; set; }
         public Int32 AutoMapped { get; set; }
+        public Int32 Created { get; set; }
         public Int32 Invalid { get; set; }
 
         public String Summary
         {
             get
             {
-                var text = $"映射{Bound} 自动匹配{AutoMapped} 未匹配{Unmapped.Count}";
+                var text = $"映射{Bound} 自动匹配{AutoMapped} 新建{Created} 未匹配{Unmapped.Count}";
                 if (Invalid > 0) text += $" 失效{Invalid}";
                 if (Unmapped.Count > 0)
                 {

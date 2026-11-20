@@ -81,7 +81,7 @@ public class QyWeixinIdentityTests
     {
         var dept = new QyWeixinDepartment { Name = "研发", ParentId = 1, Order = 2 }.ToCreateBody();
         Assert.Equal("研发", dept["name"]);
-        Assert.Equal(1, dept["parentid"]);
+        Assert.Equal(1L, dept["parentid"]);
         Assert.Equal(2, dept["order"]);
         Assert.False(dept.ContainsKey("id"));
         Assert.False(dept.ContainsKey("name_en"));

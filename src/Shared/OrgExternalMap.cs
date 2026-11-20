@@ -118,6 +118,48 @@ public class OrgExternalMap : Entity<OrgExternalMap>
     public String Remark { get => _Remark; set { if (OnPropertyChanging("Remark", value)) { _Remark = value; OnPropertyChanged("Remark"); } } }
     #endregion
 
+    #region 获取/设置 字段值
+    /// <summary>获取/设置 字段值。手写实体必须重写索引器，否则 ORM 读写字段时全部取到 null</summary>
+    /// <param name="name">字段名</param>
+    /// <returns></returns>
+    public override Object this[String name]
+    {
+        get => name switch
+        {
+            "ID" => _ID,
+            "TenantId" => _TenantId,
+            "Provider" => _Provider,
+            "ObjectType" => _ObjectType,
+            "ExternalId" => _ExternalId,
+            "ExternalParentId" => _ExternalParentId,
+            "ExternalName" => _ExternalName,
+            "ExternalPath" => _ExternalPath,
+            "LocalId" => _LocalId,
+            "SyncTime" => _SyncTime,
+            "Remark" => _Remark,
+            _ => base[name]
+        };
+        set
+        {
+            switch (name)
+            {
+                case "ID": _ID = value.ToInt(); break;
+                case "TenantId": _TenantId = value.ToInt(); break;
+                case "Provider": _Provider = Convert.ToString(value); break;
+                case "ObjectType": _ObjectType = value.ToInt(); break;
+                case "ExternalId": _ExternalId = Convert.ToString(value); break;
+                case "ExternalParentId": _ExternalParentId = Convert.ToString(value); break;
+                case "ExternalName": _ExternalName = Convert.ToString(value); break;
+                case "ExternalPath": _ExternalPath = Convert.ToString(value); break;
+                case "LocalId": _LocalId = value.ToInt(); break;
+                case "SyncTime": _SyncTime = value.ToDateTime(); break;
+                case "Remark": _Remark = Convert.ToString(value); break;
+                default: base[name] = value; break;
+            }
+        }
+    }
+    #endregion
+
     #region 查询
     /// <summary>按外部身份查找映射</summary>
     /// <param name="provider">来源实例</param>
@@ -151,6 +193,44 @@ public class OrgExternalMap : Entity<OrgExternalMap>
             (table.FindByName(nameof(TenantId)) == tenantId) &
             (table.FindByName(nameof(Provider)) == provider) &
             (table.FindByName(nameof(ObjectType)) == (Int32)kind));
+    }
+
+    /// <summary>按本地编号查找映射。同一本地对象可能对应多个外部对象，取第一条</summary>
+    /// <param name="localId">本地编号</param>
+    /// <param name="provider">来源实例</param>
+    /// <param name="kind">对象类型</param>
+    /// <param name="tenantId">租户</param>
+    /// <returns>映射，未找到返回 null</returns>
+    public static OrgExternalMap FindByLocal(Int32 localId, String provider, OrgObjectKinds kind, Int32 tenantId = 0)
+    {
+        if (localId <= 0 || provider.IsNullOrEmpty()) return null;
+
+        var table = Meta.Table;
+        return Find(
+            (table.FindByName(nameof(TenantId)) == tenantId) &
+            (table.FindByName(nameof(Provider)) == provider) &
+            (table.FindByName(nameof(ObjectType)) == (Int32)kind) &
+            (table.FindByName(nameof(LocalId)) == localId));
+    }
+
+    /// <summary>
+    /// 建立本地编号到外部 Id 的反查字典。推送企微时用它替代本地 Department.Code，
+    /// 避免字符串业务编码被当成 Int32 部门 Id。
+    /// </summary>
+    /// <param name="provider">来源实例</param>
+    /// <param name="kind">对象类型</param>
+    /// <param name="tenantId">租户</param>
+    /// <returns>本地编号到外部 Id 的字典</returns>
+    public static IDictionary<Int32, String> BuildLocalIds(String provider, OrgObjectKinds kind, Int32 tenantId = 0)
+    {
+        var dic = new Dictionary<Int32, String>();
+        foreach (var map in FindAllByProvider(provider, kind, tenantId))
+        {
+            if (map.LocalId > 0 && !map.ExternalId.IsNullOrEmpty() && !dic.ContainsKey(map.LocalId))
+                dic[map.LocalId] = map.ExternalId;
+        }
+
+        return dic;
     }
     #endregion
 }

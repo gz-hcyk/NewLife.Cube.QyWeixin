@@ -6,7 +6,7 @@ namespace NewLife.Cube.QyWeixin;
 public class QyWeixinDepartment
 {
     /// <summary>部门 id。创建时可选且必须大于 1；更新时必填</summary>
-    public Int32? Id { get; set; }
+    public Int64? Id { get; set; }
 
     /// <summary>部门名称。同级不能重复</summary>
     public String Name { get; set; }
@@ -15,7 +15,7 @@ public class QyWeixinDepartment
     public String NameEn { get; set; }
 
     /// <summary>父部门 id。根部门的子部门父 id 为 1</summary>
-    public Int32? ParentId { get; set; }
+    public Int64? ParentId { get; set; }
 
     /// <summary>次序。值大的排前面</summary>
     public Int32? Order { get; set; }
@@ -76,7 +76,7 @@ public class QyWeixinMember
     public String BizMail { get; set; }
 
     /// <summary>部门 id 列表</summary>
-    public Int32[] Department { get; set; }
+    public Int64[] Department { get; set; }
 
     /// <summary>部门内次序，与 Department 一一对应</summary>
     public Int32[] Order { get; set; }
@@ -103,7 +103,7 @@ public class QyWeixinMember
     public String Address { get; set; }
 
     /// <summary>主部门</summary>
-    public Int32? MainDepartment { get; set; }
+    public Int64? MainDepartment { get; set; }
 
     /// <summary>创建时是否邀请。null 表示不传，由企微默认（邀请）</summary>
     public Boolean? ToInvite { get; set; }
@@ -193,12 +193,12 @@ public partial class QyWeixinClient
     /// <summary>创建部门。返回新建 id。不写魔方 Department</summary>
     /// <param name="department">部门</param>
     /// <returns>部门 id</returns>
-    public async Task<Int32> CreateDepartmentAsync(QyWeixinDepartment department)
+    public async Task<Int64> CreateDepartmentAsync(QyWeixinDepartment department)
     {
         if (department == null) throw new ArgumentNullException(nameof(department));
         var token = await TokenAsync().ConfigureAwait(false);
         var raw = await PostJsonAsync("department/create?access_token=" + token, department.ToCreateBody()).ConfigureAwait(false);
-        return QyWeixinValues.PickInt(raw, "id");
+        return QyWeixinValues.PickLong(raw, "id");
     }
 
     /// <summary>更新部门。文档 https://developer.work.weixin.qq.com/document/path/90206</summary>
@@ -214,7 +214,7 @@ public partial class QyWeixinClient
     /// <summary>删除部门。不能删除根部门，不能删除含子部门或成员的部门。文档 https://developer.work.weixin.qq.com/document/path/90207</summary>
     /// <param name="id">部门 id</param>
     /// <returns>删除任务</returns>
-    public async Task DeleteDepartmentAsync(Int32 id)
+    public async Task DeleteDepartmentAsync(Int64 id)
     {
         var token = await TokenAsync().ConfigureAwait(false);
         await GetJsonAsync("department/delete", new { access_token = token, id }).ConfigureAwait(false);
@@ -223,7 +223,7 @@ public partial class QyWeixinClient
     /// <summary>获取单个部门详情</summary>
     /// <param name="id">部门 id</param>
     /// <returns>部门对象，字段在 department 节点或整包中，以 Raw 方式返回整包</returns>
-    public async Task<IDictionary<String, Object>> GetDepartmentAsync(Int32 id)
+    public async Task<IDictionary<String, Object>> GetDepartmentAsync(Int64 id)
     {
         var token = await TokenAsync().ConfigureAwait(false);
         return await GetJsonAsync("department/get", new { access_token = token, id }).ConfigureAwait(false);
@@ -232,7 +232,7 @@ public partial class QyWeixinClient
     /// <summary>获取部门列表。保留原始 department 节点字段，便于调用方自行映射</summary>
     /// <param name="id">部门 id。0 或 null 表示全量组织架构</param>
     /// <returns>部门字典数组</returns>
-    public async Task<IDictionary<String, Object>[]> GetDepartmentsAsync(Int32? id = null)
+    public async Task<IDictionary<String, Object>[]> GetDepartmentsAsync(Int64? id = null)
     {
         var token = await TokenAsync().ConfigureAwait(false);
         var args = new Dictionary<String, Object> { ["access_token"] = token };
@@ -245,7 +245,7 @@ public partial class QyWeixinClient
     /// <summary>获取指定部门及其子部门的 id 列表。文档 https://developer.work.weixin.qq.com/document/path/90209</summary>
     /// <param name="id">部门 id。0 或不传表示全量组织架构</param>
     /// <returns>部门 id 数组</returns>
-    public async Task<Int32[]> GetDepartmentChildrenIdsAsync(Int32 id = 0)
+    public async Task<Int64[]> GetDepartmentChildrenIdsAsync(Int64 id = 0)
     {
         var token = await TokenAsync().ConfigureAwait(false);
         var args = new Dictionary<String, Object> { ["access_token"] = token };
@@ -253,7 +253,7 @@ public partial class QyWeixinClient
 
         var raw = await GetJsonAsync("department/simplelist", args).ConfigureAwait(false);
         return PickArray(raw, "department_id")
-            .Select(e => QyWeixinValues.PickInt(e, "id"))
+            .Select(e => QyWeixinValues.PickLong(e, "id"))
             .Where(e => e > 0)
             .ToArray();
     }
@@ -262,7 +262,7 @@ public partial class QyWeixinClient
     /// <param name="departmentId">部门 id</param>
     /// <param name="fetchChild">是否递归获取子部门成员</param>
     /// <returns>成员字典数组</returns>
-    public async Task<IDictionary<String, Object>[]> GetDepartmentUsersAsync(Int32 departmentId, Boolean fetchChild = false)
+    public async Task<IDictionary<String, Object>[]> GetDepartmentUsersAsync(Int64 departmentId, Boolean fetchChild = false)
     {
         var token = await TokenAsync().ConfigureAwait(false);
         var raw = await GetJsonAsync("user/list", new { access_token = token, department_id = departmentId, fetch_child = fetchChild ? 1 : 0 }).ConfigureAwait(false);
@@ -399,7 +399,7 @@ public partial class QyWeixinClient
     /// <param name="partyIds">部门 id</param>
     /// <param name="tagIds">标签 id</param>
     /// <returns>邀请结果，含非法 id 列表时在响应里</returns>
-    public async Task<IDictionary<String, Object>> InviteAsync(IEnumerable<String> userIds = null, IEnumerable<Int32> partyIds = null, IEnumerable<Int32> tagIds = null)
+    public async Task<IDictionary<String, Object>> InviteAsync(IEnumerable<String> userIds = null, IEnumerable<Int64> partyIds = null, IEnumerable<Int32> tagIds = null)
     {
         var body = new Dictionary<String, Object>();
         var users = userIds?.Where(e => !e.IsNullOrEmpty()).ToArray();
@@ -462,7 +462,7 @@ public partial class QyWeixinClient
     /// <param name="userIds">成员，可空</param>
     /// <param name="partyIds">部门，可空</param>
     /// <returns>可能含非法列表的响应</returns>
-    public Task<IDictionary<String, Object>> AddTagMembersAsync(Int32 tagId, IEnumerable<String> userIds = null, IEnumerable<Int32> partyIds = null)
+    public Task<IDictionary<String, Object>> AddTagMembersAsync(Int32 tagId, IEnumerable<String> userIds = null, IEnumerable<Int64> partyIds = null)
         => PostTagMembersAsync("tag/addtagusers", tagId, userIds, partyIds);
 
     /// <summary>删除标签成员。文档 https://developer.work.weixin.qq.com/document/path/90215</summary>
@@ -470,7 +470,7 @@ public partial class QyWeixinClient
     /// <param name="userIds">成员，可空</param>
     /// <param name="partyIds">部门，可空</param>
     /// <returns>响应</returns>
-    public Task<IDictionary<String, Object>> DeleteTagMembersAsync(Int32 tagId, IEnumerable<String> userIds = null, IEnumerable<Int32> partyIds = null)
+    public Task<IDictionary<String, Object>> DeleteTagMembersAsync(Int32 tagId, IEnumerable<String> userIds = null, IEnumerable<Int64> partyIds = null)
         => PostTagMembersAsync("tag/deltagusers", tagId, userIds, partyIds);
 
     /// <summary>获取标签列表。文档 https://developer.work.weixin.qq.com/document/path/90216</summary>
@@ -522,7 +522,7 @@ public partial class QyWeixinClient
         return QyWeixinValues.Pick(raw, "jobid");
     }
 
-    private async Task<IDictionary<String, Object>> PostTagMembersAsync(String action, Int32 tagId, IEnumerable<String> userIds, IEnumerable<Int32> partyIds)
+    private async Task<IDictionary<String, Object>> PostTagMembersAsync(String action, Int32 tagId, IEnumerable<String> userIds, IEnumerable<Int64> partyIds)
     {
         var body = new Dictionary<String, Object> { ["tagid"] = tagId };
         var users = userIds?.Where(e => !e.IsNullOrEmpty()).ToArray();
