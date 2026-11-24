@@ -10,8 +10,8 @@ using XCode.Membership;
 
 namespace NewLife.Cube.QyWeixin;
 
-/// <summary>企业微信通讯录同步参数（作业参数 JSON）</summary>
-public class QyWeixinJobArgument
+/// <summary>企业微信通讯录拉取参数（作业参数 JSON）</summary>
+public class QyWeixinPullJobArgument
 {
     /// <summary>企业 Id。可写成 corp#agent 复合值，Init 后同时得到 AgentId</summary>
     [DisplayName("企业Id")]
@@ -81,18 +81,18 @@ public static class QyWeixinSyncPolicy
 /// 并把绑定固化到映射表。凭据优先作业参数（含旧 Body JSON），缺省回退魔方 OAuth 配置中的企业微信条目。
 /// 只读拉取，不调用通讯录写接口。
 /// </summary>
-[DisplayName("企业微信定时任务")]
+[DisplayName("企业微信通讯录拉取")]
 [Description("从企业微信定时拉取组织和人员信息")]
-[CronJob("QyWeixinService", "0 0 0/4 * * ? *", Enable = false)]
-public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
+[CronJob("QyWeixinPull", "0 0 0/4 * * ? *", Enable = false)]
+public class QyWeixinPullService : CubeJobBase<QyWeixinPullJobArgument>
 {
     private readonly ITracer _tracer;
 
-    /// <summary>实例化企业微信通讯录同步作业</summary>
-    public QyWeixinService(ITracer tracer) => _tracer = tracer;
+    /// <summary>实例化企业微信通讯录拉取作业</summary>
+    public QyWeixinPullService(ITracer tracer) => _tracer = tracer;
 
     /// <summary>执行作业</summary>
-    protected override async Task<String> OnExecute(QyWeixinJobArgument argument)
+    protected override async Task<String> OnExecute(QyWeixinPullJobArgument argument)
     {
         using var span = _tracer?.NewSpan("QyWeixinSync", argument);
 
@@ -457,7 +457,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
     }
 
     /// <summary>解析企微客户端。优先级：作业参数顶层字段 → 旧 Body JSON → 魔方 OAuth 配置。</summary>
-    private static (QyWeiXin Client, String Source) ResolveClient(QyWeixinJobArgument argument)
+    private static (QyWeiXin Client, String Source) ResolveClient(QyWeixinPullJobArgument argument)
     {
         ApplyLegacyBody(argument);
 
@@ -471,7 +471,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
     }
 
     /// <summary>映射表来源实例。多主体时用 Source 显式区分，默认带上企业 Id</summary>
-    private static String ResolveProvider(QyWeixinJobArgument argument, QyWeiXin client)
+    private static String ResolveProvider(QyWeixinPullJobArgument argument, QyWeiXin client)
     {
         if (argument != null && !argument.Source.IsNullOrEmpty()) return argument.Source.Trim();
 
@@ -480,7 +480,7 @@ public class QyWeixinService : CubeJobBase<QyWeixinJobArgument>
     }
 
     /// <summary>兼容旧配置：凭据写在 HTTP Body 的 JSON 里。</summary>
-    private static void ApplyLegacyBody(QyWeixinJobArgument argument)
+    private static void ApplyLegacyBody(QyWeixinPullJobArgument argument)
     {
         if (argument == null || argument.Body.IsNullOrEmpty()) return;
         if (!argument.CorpID.IsNullOrEmpty() && !argument.Secret.IsNullOrEmpty()) return;

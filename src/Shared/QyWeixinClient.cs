@@ -13,7 +13,7 @@ namespace NewLife.Cube.QyWeixin;
 /// <remarks>
 /// 凭据：显式 CorpId、Secret、AgentId，或魔方 OAuth 的 AppId 写成 corp#agent。见 <see cref="QyWeixinCredential"/>。
 /// 不实现客户联系（externalcontact）、获客助手、微信客服、家校、政民、会议全量、微盘全量、企业支付、会话存档。
-/// 通讯录写接口只推到企微，不改魔方部门/用户；本地拉取见 <see cref="QyWeixinService"/> 的冲突策略。
+/// 通讯录写接口只推到企微，不改魔方部门/用户；本地拉取见 <see cref="QyWeixinPullService"/> 的冲突策略。
 /// </remarks>
 public partial class QyWeixinClient : QyWeiXin
 {

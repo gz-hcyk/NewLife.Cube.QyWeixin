@@ -58,7 +58,7 @@ builder.Services.AddControllers()
 |---|---|---|
 | P0 | 临时素材上传/下载、图片 URL；应用消息 text/image/voice/video/file/textcard/news/mpnews/markdown/miniprogram_notice/template_card；撤回；任务卡片与模板卡片更新；被动回复加密；回调类型目录与分发 | `QyWeiXinSender` / `QyWeixinClient`、`QyWeixinReply`、`QyWeixinCallbackController` |
 | P1 | 获取/设置应用，自定义菜单；userid↔openid；网页授权 URL（对齐魔方 OAuth，不另建登录）；code→userid；JS-SDK 企业票与应用票及签名 | `QyWeixinClient`、`QyWeixinOAuth`、`QyWeixinJsSignature` |
-| P2 | 部门/成员/标签增删改、邀请、异步导入与任务查询。定时作业只拉不推 | `QyWeixinClient`、`QyWeixinService` |
+| P2 | 部门/成员/标签增删改、邀请、异步导入与任务查询。定时作业只拉不推 | `QyWeixinClient`、`QyWeixinPullService` |
 | P3 | 应用群聊；工作台 keydata 与原始模板/数据；日程、打卡、审批的薄封装 | `QyWeixinClient` |
 
 魔方基类原有的 `GetDepartments` / `GetUser` / `GetUsers` / `GetCheckIn`（固定全部打卡）/ `GetApprovals`（固定已通过）/ `GetApproval` 仍可直接用。
@@ -98,7 +98,7 @@ JS-SDK：`CreateConfigSignatureAsync` / `CreateAgentConfigSignatureAsync`。tick
 
 本地魔方部门是组织主数据。企微部门**不会**被创建进 `Department`，只在映射表 `OrgExternalMap` 里记一条「企微部门 → 本地部门」。钉钉、飞书等其它来源按同样的方式各写各的映射行，互不覆盖。
 
-| | 定时作业 `QyWeixinService` | `QyWeixinClient` 写接口 |
+| | 定时作业 `QyWeixinPull` | `QyWeixinClient` 写接口 |
 |---|---|---|
 | 部门 | 只建/更新映射，不创建、不修改本地部门 | 只写企微，不写本地 |
 | 人员 | 新建缺失人员；已有人员按 `PullMode` 决定是否更新 | 只写企微，不写本地 |
